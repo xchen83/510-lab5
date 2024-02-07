@@ -17,4 +17,4 @@
 - Learned how to use PostgreSQl to connect with the DBeaver
 
 ### Questions
-- What are some real senario / companies that uses data visualization and how did they incorprate in their product?
+- What are some companies that uses data visualization and how did they incorprate in their product?
