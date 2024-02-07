@@ -17,4 +17,4 @@
 - Learned how to use PostgreSQl to connect with the DBeaver
 
 ### Questions
-- How does the DBeaver stores the data and why do we choose it?
+- What are some real senario / companies that uses this visualization and how did they incorprate in their product?
