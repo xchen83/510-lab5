@@ -9,7 +9,6 @@ import psycopg2
 URL = 'https://visitseattle.org/events/page/'
 URL_LIST_FILE = './data/links.json'
 URL_DETAIL_FILE = './data/data.json'
-DB_CONNECTION_STRING = "dbname='test-lab5' user='test-lab5' host='localhost' password='techin510'"
 
 def get_weather_data(location_query):
     location_query = f'{location_query}, Seattle'
