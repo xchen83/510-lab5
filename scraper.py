@@ -6,6 +6,8 @@ import datetime
 from zoneinfo import ZoneInfo
 import psycopg2
 
+from db import get_db_conn
+
 URL = 'https://visitseattle.org/events/page/'
 URL_LIST_FILE = './data/links.json'
 URL_DETAIL_FILE = './data/data.json'
@@ -56,7 +58,7 @@ def list_links():
     for page_no in range(1, last_page_no + 1):
         res = requests.get(URL + str(page_no) + '/', headers={'User-Agent': 'Mozilla/5.0'})
         links.extend(re.findall(r'<h3 class="event-title"><a href="(https://visitseattle.org/events/.+?/)" title=".+?">.+?</a></h3>', res.text))
-
+        print(f'Processed page {page_no}/{last_page_no}')
     with open(URL_LIST_FILE, 'w') as file:
         json.dump(links, file)
 
@@ -98,35 +100,52 @@ def get_detail_page():
         json.dump(data, file)
 
 def insert_to_pg():
+    q = '''
+    CREATE TABLE IF NOT EXISTS events (
+        url TEXT PRIMARY KEY,
+        title TEXT,
+        date TIMESTAMP WITH TIME ZONE,
+        venue TEXT,
+        category TEXT,
+        location TEXT,
+        short_forecast TEXT,
+        min_temperature TEXT,
+        max_temperature TEXT,
+        wind_chill TEXT,
+        latitude TEXT,
+        longitude TEXT
+    );
+    '''
+    conn = get_db_conn()
+    cur = conn.cursor()
+    cur.execute(q)
+    
     urls = json.load(open(URL_LIST_FILE, 'r'))
     data = json.load(open(URL_DETAIL_FILE, 'r'))
-    
-    conn = psycopg2.connect(DB_CONNECTION_STRING)
-    cur = conn.cursor()
-
     for url, row in zip(urls, data):
-        try:
-            cur.execute(
-                """
-                INSERT INTO events (url, title, date, venue, category, location)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (url) DO NOTHING;
-                """,
-                (url, row['title'], row['date'], row['venue'], row['category'], row['location'])
-            )
-        except psycopg2.Error as e:
-            print(f"Error inserting data for URL: {url}")
-            print(e)
+        q = '''
+        INSERT INTO events (url, title, date, venue, category, location, short_forecast, min_temperature, max_temperature, wind_chill, latitude, longitude)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (url) DO NOTHING;
+        '''
+        if 'weather' not in row:
+            row['weather'] = {
+                'short_forecast': None,
+                'min_temperature': None,
+                'max_temperature': None,
+                'wind_chill': None,
+                'latitude': None,
+                'longitude': None
+            }
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        cur.execute(q, (url, row['title'], row['date'], row['venue'], row['category'], row['location'], row['weather']['short_forecast'], row['weather']['min_temperature'], row['weather']['max_temperature'], row['weather']['wind_chill'], row['weather']['latitude'], row['weather']['longitude']))
 
 
 def scrape_events_data():
-    list_links()
-    get_detail_page()
+    # list_links()
+    # get_detail_page()
     insert_to_pg()
 
 if __name__ == '__main__':
     scrape_events_data()
+
