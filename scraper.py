@@ -142,8 +142,8 @@ def insert_to_pg():
 
 
 def scrape_events_data():
-    # list_links()
-    # get_detail_page()
+    list_links()
+    get_detail_page()
     insert_to_pg()
 
 if __name__ == '__main__':
