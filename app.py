@@ -1,103 +1,90 @@
 import streamlit as st
+import datetime
 import pandas.io.sql as sqlio
 import altair as alt
+import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from geopy.geocoders import Nominatim
-import pandas as pd
-import datetime
 
 from db import conn_str
 
+# Function to generate map based on DataFrame
+def generate_map(df):
+    m = folium.Map(location=[47.6062, -122.3321], zoom_start=12)
+    for index, row in df.iterrows():
+        if pd.notnull(row['latitude']) and pd.notnull(row['longitude']):
+            folium.Marker([row['latitude'], row['longitude']], popup=row['venue']).add_to(m)
+        else:
+            print(f"Skipping row {index} due to missing coordinates")
+    return m
+
+
 st.title("Seattle Events")
 
-# Load event data from the database
 df = sqlio.read_sql_query("SELECT * FROM events", conn_str)
 
-# Convert 'date' column to datetime format
-df['date'] = pd.to_datetime(df['date'])
+# Chart for the most common event categories
+categories_chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('count()', title='Number of Events'),
+    y=alt.Y('category:N', sort='-x', title='Event Category')
+).properties(title='Most Common Event Categories in Seattle').interactive()
 
-# Dropdown for selecting a category
-category_filter = st.selectbox("Select a category", ['All'] + list(df['category'].unique()))
+st.altair_chart(categories_chart, use_container_width=True)
 
-# Date range selector for event date
-start_date, end_date = st.date_input("Select date range", [])
 
-# Location filter
-location_filter = st.selectbox("Select a location", ['All'] + list(df['location'].unique()))
+# Chart 1 for the month with the most events
+df['month'] = df['date'].dt.strftime('%B')  # Converts datetime to month name
 
-# Weather filter (optional)
-# You might want to include specific weather conditions or a boolean filter for 'Good' vs 'Bad' weather
+# Chart 2 for the month with the most events
+month_chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('count()', title='Number of Events'),
+    y=alt.Y('month:N', sort='-x', title='Month')
+).properties(title='Months with Most Events in Seattle').interactive()
 
-# Applying filters to the dataframe
-if category_filter != 'All':
-    df = df[df['category'] == category_filter]
+st.altair_chart(month_chart, use_container_width=True)
 
-if start_date and end_date:
-    df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+# Chart 3 for most popular day of the week
+df['day_of_week'] = df['date'].dt.day_name()  # Converts datetime to day of the week name
 
-if location_filter != 'All':
-    df = df[df['location'] == location_filter]
+# Chart for the most popular day of the week
+day_of_week_chart = alt.Chart(df).mark_bar().encode(
+    x=alt.X('count()', title='Number of Events'),
+    y=alt.Y('day_of_week:N', sort='-x', title='Day of the Week')
+).properties(title='Most Popular Days of the Week for Events in Seattle').interactive()
 
-# 1. Chart: Event Counts by Category
-st.altair_chart(
-    alt.Chart(df).mark_bar().encode(
-        x=alt.X("count()", title="Number of Events"),
-        y=alt.Y("category:N", sort='-x', title="Category")
-    ).properties(title="Event Counts by Category").interactive(),
-    use_container_width=True
-)
+st.altair_chart(day_of_week_chart, use_container_width=True)
 
-# 2. Chart: Events by Month
-df['month'] = df['date'].dt.month_name()
-st.altair_chart(
-    alt.Chart(df).mark_bar().encode(
-        x=alt.X("count()", title="Number of Events"),
-        y=alt.Y("month:N", sort='-x', title="Month")
-    ).properties(title="Events by Month").interactive(),
-    use_container_width=True
-)
 
-# 3. Chart: Events by Day of the Week
-df['day_of_week'] = df['date'].dt.day_name()
-st.altair_chart(
-    alt.Chart(df).mark_bar().encode(
-        x=alt.X("count()", title="Number of Events"),
-        y=alt.Y("day_of_week:N", sort='-x', title="Day of the Week")
-    ).properties(title="Events by Day of the Week").interactive(),
-    use_container_width=True
-)
+# Controls
+filtered_df = df.copy()
 
-# 4. Chart: Events by Location
-# Assuming 'location' is a suitable column for this chart. You may need to adjust based on your data structure.
-st.altair_chart(
-    alt.Chart(df).mark_bar().encode(
-        x=alt.X("count()", title="Number of Events"),
-        y=alt.Y("location:N", sort='-x', title="Location")
-    ).properties(title="Events by Location").interactive(),
-    use_container_width=True
-)
+# Filter category
+category = st.selectbox("Select a category", filtered_df['category'].unique())
+filtered_df = filtered_df[filtered_df['category'] == category]
 
-# Map Visualization
-# Initialize a map centered around Seattle
-m = folium.Map(location=[47.6062, -122.3321], zoom_start=12)
+# Filter date
+min_date = df['date'].min().date()
+max_date = df['date'].max().date()
+selected_date_range = st.date_input("Select date range", value=[min_date, max_date], min_value=min_date, max_value=max_date)
+filtered_df = filtered_df[(filtered_df['date'].dt.date >= selected_date_range[0]) & (filtered_df['date'].dt.date <= selected_date_range[1])]
 
-# Geolocator for converting locations to coordinates
-geolocator = Nominatim(user_agent="seattle_events")
+# Filter location
+locations = ['All'] + list(df['location'].unique())
+selected_location = st.selectbox("Select a location", options=locations)
 
-# Add markers for events
-for _, event in df.iterrows():
-    # Attempt to geolocate the venue/location
-    location = geolocator.geocode(event['venue'] + ', Seattle, WA')
-    if location:
-        folium.Marker(
-            location=[location.latitude, location.longitude],
-            popup=event['title'],
-            tooltip=event['venue']
-        ).add_to(m)
+if selected_location != 'All':
+    filtered_df = filtered_df[filtered_df['location'] == selected_location]
 
-# Display the map with event markers
-st_folium(m, width=730, height=500)
+# Filter weather condition
+weather_conditions = ['All'] + list(df['short_forecast'].unique())
+selected_weather_condition = st.selectbox("Select a weather condition", options=weather_conditions)
 
-# Show filtered dataframe
-st.write(df)
+if selected_weather_condition != 'All':
+    filtered_df = filtered_df[filtered_df['short_forecast'] == selected_weather_condition]
+
+# Display filtered data
+st.write(filtered_df)
+
+# Update map based on filtered data
+st.subheader("Event Locations")
+st_folium(generate_map(filtered_df), width=1200, height=600)

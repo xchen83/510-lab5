@@ -2,3 +2,5 @@
 *.venv
 *.pyc
 *.conda
+*env
+*venv
