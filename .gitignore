@@ -4,3 +4,5 @@
 *.conda
 *env
 *venv
+*.streamlit/secrets.toml
+```
