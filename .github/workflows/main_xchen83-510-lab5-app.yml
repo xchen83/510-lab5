@@ -66,4 +66,4 @@ jobs:
         with:
           app-name: 'xchen83-510-lab5-app'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_E496448272E2479BA06300521D7242E2 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C9AABF1A6347488C9B7C064E9001BF3A }}
